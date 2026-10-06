@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+// Hằng số vật lý và hệ số đổi đơn vị dùng chung trong quá trình giải mã.
+
 const float TungLamHWT901B::GRAVITY_MPS2 = 9.80665f;
 const float TungLamHWT901B::DEG_TO_RAD_F = 0.01745329251994329577f;
 
@@ -14,6 +16,8 @@ TungLamHWT901B::TungLamHWT901B()
   resetRuntime();
 }
 
+// Đưa toàn bộ trạng thái runtime về mặc định. Hàm này không cấu hình phần cứng;
+// nó chỉ xóa buffer parser, dữ liệu đã giải mã và trạng thái đọc thanh ghi.
 void TungLamHWT901B::resetRuntime() {
   memset(_frame, 0, sizeof(_frame));
   _frameIndex = 0;
@@ -31,6 +35,9 @@ void TungLamHWT901B::attach(Stream &stream) {
   resetRuntime();
 }
 
+// Hàm update() là điểm vào chính của đường nhận dữ liệu.
+// Chỉ xử lý các byte đang có sẵn trong Stream rồi trả về ngay, vì vậy không
+// tạo khoảng chờ chủ động và phù hợp với loop(), PID hoặc state machine realtime.
 bool TungLamHWT901B::update() {
   if (_stream == nullptr) {
     return false;
@@ -53,6 +60,9 @@ bool TungLamHWT901B::update() {
   return decoded;
 }
 
+// Bộ phân tích frame hoạt động theo từng byte để không phụ thuộc kích thước
+// buffer UART của từng Arduino Core. Khi chưa bắt đầu frame, mọi byte khác
+// 0x55 đều được bỏ qua để tự tìm lại đầu khung.
 bool TungLamHWT901B::feedByte(uint8_t value) {
   if (_frameIndex == 0) {
     if (value != FRAME_HEAD) {
@@ -70,6 +80,7 @@ bool TungLamHWT901B::feedByte(uint8_t value) {
     return false;
   }
 
+  // Checksum WIT = tổng 10 byte đầu, chỉ giữ 8 bit thấp.
   uint8_t checksum = 0;
   for (uint8_t i = 0; i < (FRAME_SIZE - 1); ++i) {
     checksum = static_cast<uint8_t>(checksum + _frame[i]);
@@ -86,6 +97,9 @@ bool TungLamHWT901B::feedByte(uint8_t value) {
   return true;
 }
 
+// Khi checksum sai, không vứt mù toàn bộ 11 byte. Ta tìm 0x55 tiếp theo
+// ngay trong buffer lỗi và giữ lại phần đuôi có khả năng là đầu frame mới.
+// Cách này giúp phục hồi nhanh hơn khi UART mất hoặc chèn một byte giữa luồng.
 void TungLamHWT901B::resyncAfterBadFrame() {
   uint8_t next = 1;
 
@@ -115,6 +129,9 @@ uint16_t TungLamHWT901B::readU16(const uint8_t *p) {
       (static_cast<uint16_t>(p[1]) << 8));
 }
 
+// Giải mã một frame đã qua kiểm tra checksum. Mỗi loại frame chỉ cập nhật
+// nhóm dữ liệu tương ứng và mốc thời gian riêng, vì các nhóm có thể được
+// cấu hình phát ở những thời điểm khác nhau.
 void TungLamHWT901B::decodeFrame(const uint8_t *frame) {
   const uint32_t now = millis();
 
@@ -128,6 +145,7 @@ void TungLamHWT901B::decodeFrame(const uint8_t *frame) {
       const int16_t az = readI16(&frame[6]);
       const int16_t temperature = readI16(&frame[8]);
 
+      // WIT chuẩn hóa gia tốc theo thang ±16 g trên số signed 16 bit.
       _data.ax_g = static_cast<float>(ax) * (16.0f / 32768.0f);
       _data.ay_g = static_cast<float>(ay) * (16.0f / 32768.0f);
       _data.az_g = static_cast<float>(az) * (16.0f / 32768.0f);
@@ -148,6 +166,7 @@ void TungLamHWT901B::decodeFrame(const uint8_t *frame) {
       const int16_t gz = readI16(&frame[6]);
       const uint16_t voltage = readU16(&frame[8]);
 
+      // WIT chuẩn hóa gyro theo thang ±2000 độ/giây trên signed 16 bit.
       _data.gx_dps = static_cast<float>(gx) * (2000.0f / 32768.0f);
       _data.gy_dps = static_cast<float>(gy) * (2000.0f / 32768.0f);
       _data.gz_dps = static_cast<float>(gz) * (2000.0f / 32768.0f);
@@ -167,6 +186,8 @@ void TungLamHWT901B::decodeFrame(const uint8_t *frame) {
       const int16_t pitch = readI16(&frame[4]);
       const int16_t yaw = readI16(&frame[6]);
 
+      // Góc Euler dùng thang ±180°. Luôn chuẩn hóa trước khi lưu để giữ
+      // cùng một quy ước miền góc cho cả dữ liệu raw và dữ liệu đã bù offset.
       _data.roll_raw_deg =
           normalize180(static_cast<float>(roll) * (180.0f / 32768.0f));
       _data.pitch_raw_deg =
@@ -206,6 +227,8 @@ void TungLamHWT901B::decodeFrame(const uint8_t *frame) {
     }
 
     case FRAME_REGISTER: {
+      // Frame 0x5F chứa bốn word liên tiếp bắt đầu từ địa chỉ đã request.
+      // Địa chỉ cơ sở được lưu từ requestRegister(), không nằm trong frame này.
       _lastRegisterValues[0] = readI16(&frame[2]);
       _lastRegisterValues[1] = readI16(&frame[4]);
       _lastRegisterValues[2] = readI16(&frame[6]);
@@ -220,6 +243,10 @@ void TungLamHWT901B::decodeFrame(const uint8_t *frame) {
   }
 }
 
+// Công thức thống nhất cho ba trục:
+//   góc sử dụng = normalize(góc raw - offset)
+// Vì offset được tính từ raw - target, setCurrentYaw(180) vẫn bảo toàn đúng
+// mốc +180° nhờ normalize180() dùng miền (-180, 180].
 void TungLamHWT901B::applyAngleOffsets() {
   _data.roll_deg =
       normalize180(_data.roll_raw_deg - _data.roll_offset_deg);
@@ -305,6 +332,7 @@ bool TungLamHWT901B::zeroPitch() {
   return setCurrentPitch(0.0f);
 }
 
+// Gán mốc Yaw chỉ thay đổi offset trong RAM Arduino, không ghi flash IMU.
 bool TungLamHWT901B::setCurrentYaw(float yawDeg) {
   if (!_data.has_angle) {
     return false;
@@ -381,6 +409,9 @@ float TungLamHWT901B::getYawOffset() const {
   return _data.yaw_offset_deg;
 }
 
+// Gói ghi thanh ghi chuẩn WIT luôn dài 5 byte:
+//   FF AA ADDR DATA_L DATA_H
+// Hàm chỉ xác nhận số byte được Stream chấp nhận để ghi, không chờ phản hồi.
 bool TungLamHWT901B::sendCommand(uint8_t address, uint16_t value) {
   if (_stream == nullptr) {
     return false;
@@ -410,6 +441,8 @@ bool TungLamHWT901B::writeRegisterUnlocked(
   return sendCommand(address, value);
 }
 
+// Theo trình tự cấu hình chuẩn của WIT: mở khóa trước khi ghi và tùy chọn
+// gửi SAVE sau cùng. Các bước không có delay chủ động trong thư viện.
 bool TungLamHWT901B::writeRegister(
     uint8_t address,
     uint16_t value,
@@ -429,6 +462,9 @@ bool TungLamHWT901B::writeRegister(
   return true;
 }
 
+// Đây là zero ở phía cảm biến, khác hoàn toàn zeroYaw() phần mềm.
+// Sau khi gửi CALSW=0x0004 thành công, xóa offset Yaw trong RAM để tránh
+// hai lớp hiệu chỉnh chồng lên nhau.
 bool TungLamHWT901B::sensorZeroHeading() {
   if (!writeRegister(REG_CALSW, 0x0004, true)) {
     return false;
@@ -477,6 +513,8 @@ bool TungLamHWT901B::setLed(bool on) {
   return writeRegister(REG_LEDOFF, on ? 0x0000 : 0x0001, true);
 }
 
+// Chế độ robot gom ba thao tác cấu hình vào cùng một phiên mở khóa để giảm
+// số gói lệnh: chọn ACC + GYRO + ANGLE, đặt tần số, sau đó SAVE một lần.
 bool TungLamHWT901B::configureRobotMode(TungLamHWT901BRate rate) {
   if (_stream == nullptr) {
     return false;
@@ -532,6 +570,8 @@ uint32_t TungLamHWT901B::baudValue(TungLamHWT901BBaud baud) {
   }
 }
 
+// READADDR 0x27 yêu cầu HWT901B trả dữ liệu bắt đầu từ address. Cờ phản hồi
+// được xóa trước khi gửi để người dùng không đọc nhầm kết quả của request cũ.
 bool TungLamHWT901B::requestRegister(uint8_t address) {
   if (_stream == nullptr) {
     return false;
@@ -574,6 +614,7 @@ uint32_t TungLamHWT901B::byteCount() const {
   return _data.bytes_received;
 }
 
+// Chỉ xóa bộ đếm chẩn đoán; không đụng tới dữ liệu đo, cờ has_* hay offset.
 void TungLamHWT901B::clearStatistics() {
   _data.valid_frames = 0;
   _data.checksum_errors = 0;
@@ -581,6 +622,7 @@ void TungLamHWT901B::clearStatistics() {
   _data.bytes_received = 0;
 }
 
+// Dùng miền (-180, 180] để +180° được giữ nguyên thay vì bị đổi thành -180°.
 float TungLamHWT901B::normalize180(float deg) {
   while (deg > 180.0f) {
     deg -= 360.0f;
@@ -593,6 +635,7 @@ float TungLamHWT901B::normalize180(float deg) {
   return deg;
 }
 
+// Biểu diễn heading theo miền dương [0, 360) khi ứng dụng cần la bàn/GUI.
 float TungLamHWT901B::normalize360(float deg) {
   while (deg >= 360.0f) {
     deg -= 360.0f;

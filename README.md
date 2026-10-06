@@ -1,8 +1,12 @@
 # TungLam_HWT901B
 
-**TungLam_HWT901B** là thư viện Arduino UART non-blocking dành cho **WIT Motion HWT901B TTL** và các thiết bị tương thích **WIT Standard Protocol**.
+**TungLam_HWT901B** là thư viện Arduino giao tiếp UART **không chặn** dành cho **WIT Motion HWT901B TTL** và các thiết bị tương thích **WIT Standard Protocol**.
 
 Tác giả: **Nguyễn Khắc Tùng Lâm — Tùng Lâm Automation**
+
+## Triết lý sử dụng
+
+API và identifier giữ tên tiếng Anh chuẩn kỹ thuật để tương thích hệ sinh thái Arduino; **toàn bộ comment, Doxygen, ví dụ và tài liệu hướng dẫn được viết bằng tiếng Việt**.
 
 Mục tiêu của thư viện:
 
@@ -11,12 +15,12 @@ Mục tiêu của thư viện:
 - Tự kiểm tra checksum và tự đồng bộ lại frame khi UART nhiễu/lệch byte.
 - Tự quản lý offset góc bên trong thư viện.
 - Cho phép đặt góc hiện tại thành **bất kỳ giá trị nào**.
-- Có API cấu hình trực tiếp các register WIT khi cần.
-- Dùng được với `HardwareSerial`, `SoftwareSerial` và các class tương thích Arduino `Stream`.
+- Có API cấu hình trực tiếp các thanh ghi WIT khi cần.
+- Dùng được với `HardwareSerial`, `SoftwareSerial` và các lớp tương thích Arduino `Stream`.
 
 ---
 
-## Quick start — Arduino Mega 2560
+## Bắt đầu nhanh — Arduino Mega 2560
 
 ### Nối dây
 
@@ -31,7 +35,7 @@ Ví dụ dùng `Serial1`:
 
 > TX của IMU nối vào RX của Arduino, RX của IMU nối vào TX của Arduino. Hai thiết bị phải chung GND.
 
-### Code tối thiểu
+### Chương trình tối thiểu
 
 ```cpp
 #include <TungLam_HWT901B.h>
@@ -40,7 +44,7 @@ HWT901B imu;
 
 void setup() {
   Serial.begin(115200);
-  // 9600 la baud mac dinh WIT Standard Protocol.
+  // 9600 là baud mặc định của WIT Standard Protocol.
   imu.begin(Serial1);
 }
 
@@ -53,7 +57,7 @@ void loop() {
 }
 ```
 
-Điểm quan trọng: gọi `imu.update()` thường xuyên trong `loop()`. Hàm này non-blocking và chỉ xử lý các byte UART đang có.
+Điểm quan trọng: gọi `imu.update()` thường xuyên trong `loop()`. Hàm này không chặn và chỉ xử lý các byte UART đang có.
 
 ---
 
@@ -86,7 +90,7 @@ imu.getYaw();       // ~180°
 imu.getRawYaw();    // vẫn ~89°
 ```
 
-Library tự tính và giữ:
+Thư viện tự tính và giữ:
 
 ```text
 offset = rawYaw - targetYaw
@@ -100,9 +104,9 @@ offset = 89 - 180 = -91°
 yaw    = 89 - (-91) = 180°
 ```
 
-Library tự xử lý wrap qua biên `-180 / +180`.
+Thư viện tự xử lý việc quấn góc qua biên `-180 / +180`.
 
-Software offset này chỉ nằm trong RAM của Arduino. Reset Arduino thì offset trở về mặc định.
+Offset phần mềm này chỉ nằm trong RAM của Arduino. Khi reset Arduino, offset trở về mặc định.
 
 ---
 
@@ -126,9 +130,9 @@ imu.clearYawOffset();
 
 ---
 
-# Software zero và sensor zero khác nhau thế nào?
+# Zero phần mềm và zero trên cảm biến khác nhau thế nào?
 
-## Khuyến nghị cho robot: software zero
+## Khuyến nghị cho robot: zero phần mềm
 
 ```cpp
 imu.zeroYaw();
@@ -139,19 +143,19 @@ imu.setCurrentYaw(180.0f);
 
 - tức thời;
 - không ghi cấu hình IMU;
-- không cần chờ sensor lưu;
+- không cần chờ cảm biến lưu;
 - có thể gọi nhiều lần khi robot đổi mốc;
-- phù hợp heading/odometry/control.
+- phù hợp cho heading, odometry và điều khiển robot.
 
-## Zero trên chính HWT901B
+## Zero trực tiếp trên HWT901B
 
 ```cpp
 imu.sensorZeroHeading();
 ```
 
-Hàm này gửi lệnh WIT tới sensor để thực hiện heading zero bằng register `CALSW`.
+Hàm này gửi lệnh WIT tới cảm biến để thực hiện zero heading bằng thanh ghi `CALSW`.
 
-Không nên dùng nó thay cho software zero nếu mục tiêu chỉ là đổi hệ quy chiếu của robot trong lúc chạy.
+Không nên dùng nó thay cho zero phần mềm nếu mục tiêu chỉ là đổi hệ quy chiếu của robot trong lúc chạy.
 
 ---
 
@@ -175,7 +179,7 @@ Nếu cần `0...360°`:
 float yaw360 = imu.getYaw360();
 ```
 
-Góc chưa bù offset:
+Góc gốc chưa bù offset:
 
 ```cpp
 imu.getRawRoll();
@@ -207,7 +211,7 @@ imu.setCurrentYaw(180.0f);
 
 # Đọc gia tốc
 
-Đơn vị mặc định getter là **m/s²**:
+Đơn vị mặc định của getter là **m/s²**:
 
 ```cpp
 float ax = imu.getAccelX();
@@ -235,7 +239,7 @@ imu.getGyroY();
 imu.getGyroZ();
 ```
 
-Nếu control cần **rad/s**:
+Nếu thuật toán điều khiển cần **rad/s**:
 
 ```cpp
 imu.getGyroXRad();
@@ -245,7 +249,7 @@ imu.getGyroZRad();
 
 ---
 
-# Magnetometer
+# Từ kế
 
 ```cpp
 imu.getMagX();
@@ -253,13 +257,13 @@ imu.getMagY();
 imu.getMagZ();
 ```
 
-Giá trị trả về là raw signed 16-bit theo frame WIT.
+Giá trị trả về là số nguyên có dấu 16 bit thô theo frame WIT.
 
 ---
 
 # Quaternion
 
-Nếu HWT901B đang được cấu hình xuất frame quaternion:
+Nếu HWT901B đang được cấu hình phát frame quaternion:
 
 ```cpp
 imu.getQ0();
@@ -270,7 +274,7 @@ imu.getQ3();
 
 ---
 
-# Snapshot đầy đủ
+# Ảnh chụp dữ liệu đầy đủ
 
 ```cpp
 TungLamHWT901BData data;
@@ -282,7 +286,7 @@ if (imu.getData(data)) {
 }
 ```
 
-Dùng snapshot khi cần đọc nhiều field trong cùng một lần.
+Dùng cấu trúc snapshot khi cần lấy nhiều trường dữ liệu trong cùng một lần.
 
 ---
 
@@ -302,7 +306,7 @@ Tuổi frame cuối:
 uint32_t age = imu.ageMs();
 ```
 
-Diagnostics:
+Các bộ đếm chẩn đoán:
 
 ```cpp
 imu.frameCount();
@@ -313,15 +317,15 @@ imu.byteCount();
 
 ---
 
-# HardwareSerial
+# Dùng HardwareSerial
 
-Mega2560 nên ưu tiên UART phần cứng. Với sensor đang ở baud mặc định WIT:
+Mega2560 nên ưu tiên UART phần cứng. Với cảm biến đang ở baud mặc định WIT:
 
 ```cpp
 imu.begin(Serial1);       // 9600 baud
 ```
 
-Nếu sensor đã được cấu hình 115200:
+Nếu cảm biến đã được cấu hình 115200:
 
 ```cpp
 imu.begin(Serial1, 115200);
@@ -333,7 +337,7 @@ Với robot chạy encoder/PID/PS2/stepper đồng thời, **HardwareSerial là 
 
 ---
 
-# SoftwareSerial
+# Dùng SoftwareSerial
 
 Ví dụ UNO/Nano AVR:
 
@@ -352,15 +356,15 @@ void setup() {
 }
 ```
 
-> `begin(..., baud)` chỉ cấu hình UART phía Arduino. Nó không tự đoán hay tự thay baud hiện tại của IMU.
+> `begin(..., baud)` chỉ cấu hình UART phía Arduino. Hàm không tự dò và cũng không tự đổi baud hiện tại của IMU.
 
-SoftwareSerial ở baud cao có thể làm tăng jitter hoặc mất byte khi MCU còn xử lý nhiều interrupt. Với hệ robot thật nên dùng HardwareSerial.
+SoftwareSerial ở baud cao có thể làm tăng jitter hoặc mất byte khi MCU còn xử lý nhiều ngắt. Với robot thật nên ưu tiên HardwareSerial.
 
 ---
 
-# Dùng Stream đã khởi tạo sẵn
+# Dùng Stream đã được khởi tạo sẵn
 
-Nếu UART được cấu hình bởi phần khác:
+Nếu UART đã được một phần khác của chương trình cấu hình:
 
 ```cpp
 Serial1.begin(115200);
@@ -382,7 +386,7 @@ ACC + GYRO + ANGLE
 100 Hz
 ```
 
-> Với 3 frame 11 byte ở 100 Hz, hãy dùng baud đủ cao (khuyến nghị 115200). Ví dụ này giả định HWT901B và UART host đã cùng ở 115200; không nên đặt 100 Hz khi vẫn dùng 9600.
+> Với 3 frame 11 byte ở 100 Hz, hãy dùng baud đủ cao, khuyến nghị 115200. Ví dụ này giả định HWT901B và UART phía Arduino đã cùng ở 115200; không nên đặt 100 Hz khi vẫn dùng 9600.
 
 Chỉ gọi các lệnh cấu hình trong `setup()` hoặc khi thật sự cần đổi cấu hình.
 
@@ -390,7 +394,7 @@ Không gọi liên tục trong `loop()`.
 
 ---
 
-# Output rate
+# Tần số xuất dữ liệu
 
 ```cpp
 imu.setRate(TungLamHWT901BRate::Hz10);
@@ -402,7 +406,7 @@ imu.setRate(TungLamHWT901BRate::Hz200);
 
 ---
 
-# Chọn dữ liệu sensor xuất ra
+# Chọn dữ liệu cảm biến xuất ra
 
 Ví dụ chỉ ACC + GYRO + ANGLE:
 
@@ -427,7 +431,7 @@ imu.setOutput(
 
 ---
 
-# Bandwidth, algorithm, orientation
+# Băng thông, thuật toán và tư thế lắp
 
 ```cpp
 imu.setBandwidth(TungLamHWT901BBandwidth::Hz20);
@@ -443,9 +447,9 @@ imu.setOrientation(
 
 ---
 
-# Đổi baud của sensor
+# Đổi baud của cảm biến
 
-Ví dụ đổi sensor sang 9600:
+Ví dụ đổi cảm biến sang 9600:
 
 ```cpp
 imu.setSensorBaud(
@@ -453,21 +457,21 @@ imu.setSensorBaud(
 );
 ```
 
-Sau khi sensor đổi baud, UART host cũng phải được khởi tạo lại đúng baud mới.
+Sau khi cảm biến đổi baud, UART phía Arduino cũng phải được khởi tạo lại đúng baud mới.
 
 Khuyến nghị: chỉ đổi baud trong một sketch cấu hình riêng, sau đó chạy chương trình chính với baud đã biết.
 
 ---
 
-# Register API nâng cao
+# API thanh ghi nâng cao
 
-Ghi register:
+Ghi thanh ghi:
 
 ```cpp
 imu.writeRegister(address, value);
 ```
 
-Library tự đóng gói chuỗi:
+Thư viện tự đóng gói chuỗi:
 
 ```text
 UNLOCK
@@ -477,7 +481,7 @@ WRITE
 SAVE
 ```
 
-Yêu cầu đọc register:
+Yêu cầu đọc thanh ghi:
 
 ```cpp
 imu.requestRegister(address);
@@ -493,20 +497,20 @@ if (imu.hasRegisterResponse()) {
 }
 ```
 
-Đây là API advanced; với hầu hết project robot không cần dùng trực tiếp.
+Đây là API nâng cao; phần lớn dự án robot không cần dùng trực tiếp.
 
 ---
 
-# Parser non-blocking
+# Bộ phân tích UART không chặn
 
-Data flow:
+Luồng dữ liệu:
 
 ```text
 UART Stream
     ↓
 update()
     ↓
-byte-by-byte parser
+bộ phân tích từng byte
     ↓
 tìm 0x55
     ↓
@@ -516,9 +520,9 @@ checksum
     ├── sai → resync
     └── đúng
           ↓
-       decode
+       giải mã
           ↓
-     internal state
+     trạng thái nội bộ
           ↓
       getter API
 ```
@@ -533,36 +537,36 @@ Không có:
 
 ---
 
-# Frame được decode ở v0.1.0
+# Các frame đã hỗ trợ giải mã
 
 | Frame | Dữ liệu |
 |---|---|
-| `0x51` | Acceleration + temperature |
-| `0x52` | Angular velocity |
+| `0x51` | Gia tốc + nhiệt độ |
+| `0x52` | Vận tốc góc |
 | `0x53` | Roll/Pitch/Yaw + version |
-| `0x54` | Magnetic field |
+| `0x54` | Từ trường |
 | `0x59` | Quaternion |
-| `0x5F` | Register response |
+| `0x5F` | Phản hồi thanh ghi |
 
-Các frame WIT khác vẫn được parser nhận dạng ở mức frame hợp lệ và được tính vào diagnostics nếu chưa có decoder chuyên biệt.
+Các frame WIT khác vẫn được bộ phân tích xác nhận ở mức frame hợp lệ và được tính vào bộ đếm chẩn đoán nếu chưa có bộ giải mã chuyên biệt.
 
 ---
 
-# Examples
+# Các ví dụ
 
 Arduino IDE:
 
 1. **01_BasicAngle** — khởi tạo và đọc Roll/Pitch/Yaw.
 2. **02_SetCurrentYaw** — ví dụ trực tiếp góc hiện tại → 180°.
-3. **03_ZeroYaw** — reset yaw bằng software offset.
-4. **04_AccelGyro** — acceleration + gyroscope.
+3. **03_ZeroYaw** — zero Yaw bằng offset phần mềm.
+4. **04_AccelGyro** — đọc gia tốc và vận tốc góc.
 5. **05_SoftwareSerial** — UNO/Nano với UART mềm.
-6. **06_SensorConfig** — output/rate/config.
-7. **07_AdvancedRegister** — đọc/ghi register nâng cao.
+6. **06_SensorConfig** — cấu hình dữ liệu đầu ra và tần số.
+7. **07_AdvancedRegister** — đọc/ghi thanh ghi nâng cao.
 
 ---
 
-# Lưu ý realtime
+# Lưu ý thời gian thực
 
 Thư viện không chiếm timer và không có ISR riêng.
 
@@ -574,11 +578,11 @@ void loop() {
 
   ps2.update();
   robot.update();
-  // PID / state machine / sensor...
+  // PID / máy trạng thái / cảm biến...
 }
 ```
 
-Nếu hệ dùng RTOS, gọi `update()` từ một task chịu ownership của UART hoặc bảo vệ Stream khỏi truy cập đồng thời.
+Nếu hệ dùng RTOS, gọi `update()` từ một task chịu quyền sở hữu UART hoặc bảo vệ Stream khỏi truy cập đồng thời.
 
 ---
 
@@ -606,7 +610,7 @@ Sketch
 
 ---
 
-# Nguồn protocol
+# Nguồn giao thức
 
 Thư viện được xây dựng theo tài liệu **WIT Standard Communication Protocol** và thông số HWT901B chính hãng:
 
@@ -616,23 +620,23 @@ Thư viện được xây dựng theo tài liệu **WIT Standard Communication P
 
 ---
 
-# Trạng thái release
+# Trạng thái phát hành
 
-**v0.1.0**
+**v0.1.1**
 
-Software baseline gồm parser, angle remapping, sensor configuration và examples.
+Bản vá chuẩn hóa toàn bộ tài liệu, Doxygen và comment tiếng Việt; logic điều khiển và giao thức giữ nguyên so với v0.1.0.
 
-Trước khi gọi một phiên bản là **hardware-stable**, nên chạy regression bằng HWT901B thật ở baud/rate dự kiến của robot và kiểm tra:
+Trước khi gọi một phiên bản là **ổn định trên phần cứng**, nên chạy kiểm thử hồi quy bằng HWT901B thật ở baud/tần số dự kiến của robot và kiểm tra:
 
-- checksum error trong endurance;
-- unplug/replug;
-- wrap `+180/-180`;
+- lỗi checksum khi chạy bền;
+- rút/cắm lại cảm biến;
+- chuyển góc qua biên `+180/-180`;
 - `setCurrentYaw()` ở nhiều tư thế;
 - 100 Hz / 200 Hz;
-- SoftwareSerial nếu project bắt buộc dùng UART mềm.
+- SoftwareSerial nếu dự án bắt buộc dùng UART mềm.
 
 ---
 
-# License
+# Giấy phép
 
 MIT License.
