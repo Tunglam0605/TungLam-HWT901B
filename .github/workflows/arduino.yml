@@ -1,0 +1,42 @@
+name: Arduino CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Arduino Library Lint
+        uses: arduino/arduino-lint-action@v3
+        with:
+          library-manager: submit
+          compliance: strict
+
+  mega2560:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install AVR core
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+
+      - name: Compile all examples for Mega2560
+        shell: bash
+        run: |
+          set -euo pipefail
+          for sketch in examples/*; do
+            echo "=== Compiling $sketch ==="
+            arduino-cli compile \
+              --warnings all \
+              --fqbn arduino:avr:mega \
+              --library . \
+              "$sketch"
+          done
